@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RetouchPro - 智慧分區照片美顏與微瑕修復工具</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: {
+                            900: '#0F1015',
+                            800: '#171922',
+                            700: '#232634',
+                            600: '#323748',
+                        },
+                        brand: {
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #171922;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #323748;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6366f1;
+        }
+        /* Custom Range Input */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type=range]:focus {
+            outline: none;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #323748;
+            border-radius: 3px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: #6366f1;
+            cursor: pointer;
+            -webkit-appearance: none;
+            margin-top: -6px;
+            box-shadow: 0 0 10px rgba(99, 102, 241, 0.5);
+            transition: transform 0.1s ease;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+        }
+        /* Split comparison handle */
+        .split-divider {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background-color: #ffffff;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            cursor: ew-resize;
+            z-index: 30;
+        }
+        .split-handle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 32px;
+            height: 32px;
+            background: white;
+            border-radius: 50%;
+            color: #0F1015;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+        }
+        .target-tab.active {
+            background-color: rgba(99, 102, 241, 0.2);
+            border-color: #6366f1;
+            color: #ffffff;
+        }
+    </style>
+</head>
+<body class="bg-dark-900 text-gray-100 font-sans min-h-screen flex flex-col overflow-x-hidden selection:bg-brand-500 selection:text-white">
+
+    <!-- Header -->
+    <header class="border-b border-dark-700 bg-dark-800/90 backdrop-blur-md sticky top-0 z-40 px-4 lg:px-8 py-3 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <div class="p-2 bg-brand-500/20 text-brand-500 rounded-xl">
+                <i data-lucide="layers" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-lg leading-tight tracking-wide bg-gradient-to-r from-white via-gray-200 to-brand-500 bg-clip-text text-transparent">
+                    RetouchPro Studio
+                </h1>
+                <p class="text-xs text-gray-400">區域分割選取與人像精細微修工具</p>
+            </div>
+        </div>
+
+        <!-- Top Action Buttons -->
+        <div class="flex items-center space-x-2">
+            <button id="undoBtn" disabled class="p-2 text-gray-400 hover:text-white hover:bg-dark-700 rounded-lg disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed transition" title="復原 (Ctrl+Z)">
+                <i data-lucide="undo-2" class="w-5 h-5"></i>
+            </button>
+            <button id="redoBtn" disabled class="p-2 text-gray-400 hover:text-white hover:bg-dark-700 rounded-lg disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed transition" title="重做 (Ctrl+Y)">
+                <i data-lucide="redo-2" class="w-5 h-5"></i>
+            </button>
+            <div class="h-5 w-px bg-dark-700 mx-1"></div>
+            <button id="resetAllBtn" class="px-3 py-1.5 text-xs text-gray-300 hover:text-white hover:bg-dark-700 rounded-lg flex items-center space-x-1 transition border border-dark-600">
+                <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                <span>重設所有</span>
+            </button>
+            <button id="downloadBtn" disabled class="px-4 py-1.5 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-semibold flex items-center space-x-1.5 shadow-lg shadow-brand-600/20 disabled:opacity-40 disabled:cursor-not-allowed transition">
+                <i data-lucide="download" class="w-4 h-4"></i>
+                <span>下載高清圖</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 flex flex-col lg:flex-row h-[calc(100vh-61px)] overflow-hidden">
+
+        <!-- Center/Left Canvas Preview Area -->
+        <section class="flex-1 bg-dark-900 relative flex items-center justify-center p-4 min-h-[350px] lg:min-h-0 overflow-hidden">
+            
+            <!-- Drag and Drop Dropzone -->
+            <div id="dropzone" class="border-2 border-dashed border-dark-600 hover:border-brand-500 rounded-2xl p-8 max-w-md w-full text-center transition cursor-pointer bg-dark-800/40 hover:bg-dark-800/80 group flex flex-col items-center">
+                <input type="file" id="fileInput" accept="image/*" class="hidden">
+                <div class="w-16 h-16 rounded-2xl bg-brand-500/10 text-brand-500 flex items-center justify-center mb-4 group-hover:scale-110 transition duration-300">
+                    <i data-lucide="image-plus" class="w-8 h-8"></i>
+                </div>
+                <h3 class="text-base font-semibold mb-1 text-gray-200">上傳人物照片進行分區調校</h3>
+                <p class="text-xs text-gray-400 mb-4">點擊選擇照片，或將檔案拖拽至此處 (支持 PNG, JPG, WEBP)</p>
+                <button id="sampleImgBtn" class="text-xs text-brand-400 hover:text-brand-300 hover:underline flex items-center gap-1">
+                    <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> 試用範例人像照片
+                </button>
+            </div>
+
+            <!-- Canvas Viewport -->
+            <div id="editorViewport" class="hidden relative w-full h-full flex items-center justify-center overflow-hidden">
+                <!-- Wrapper for absolute layer alignment -->
+                <div id="canvasWrapper" class="relative shadow-2xl rounded-lg overflow-hidden max-w-full max-h-full">
+                    <!-- Base Rendered Canvas -->
+                    <canvas id="mainCanvas" class="block max-w-full max-h-full object-contain cursor-default"></canvas>
+                    
+                    <!-- Original Image Canvas for Split/Hold view -->
+                    <canvas id="compareCanvas" class="block absolute top-0 left-0 w-full h-full object-contain pointer-events-none opacity-0 transition-opacity duration-150"></canvas>
+                    
+                    <!-- Split View Overlay Divider -->
+                    <div id="splitDivider" class="split-divider hidden">
+                        <div class="split-handle">
+                            <i data-lucide="chevrons-left-right" class="w-4 h-4"></i>
+                        </div>
+                    </div>
+
+                    <!-- Custom Brush Cursor -->
+                    <div id="brushCursor" class="pointer-events-none absolute border-2 border-white/80 bg-brand-500/20 rounded-full -translate-x-1/2 -translate-y-1/2 hidden z-30 shadow-sm"></div>
+                </div>
+
+                <!-- Floating Canvas Toolbar Overlay -->
+                <div class="absolute bottom-4 left-1/2 -translate-x-1/2 bg-dark-800/90 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-dark-600 flex items-center space-x-3 text-xs shadow-xl z-20">
+                    <label class="flex items-center space-x-1.5 cursor-pointer text-gray-300 hover:text-white select-none">
+                        <input type="checkbox" id="toggleMaskOverlay" checked class="accent-brand-500 rounded">
+                        <span>顯示區域遮罩</span>
+                    </label>
+                    <div class="h-3.5 w-px bg-dark-600"></div>
+                    <button id="holdViewBtn" class="px-2 py-1 rounded-full text-gray-300 hover:text-white hover:bg-dark-700 transition flex items-center space-x-1 select-none">
+                        <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+                        <span>按住看原圖</span>
+                    </button>
+                    <div class="h-3.5 w-px bg-dark-600"></div>
+                    <button id="splitModeBtn" class="px-2 py-1 rounded-full text-gray-300 hover:text-white hover:bg-dark-700 transition flex items-center space-x-1">
+                        <i data-lucide="columns" class="w-3.5 h-3.5"></i>
+                        <span>對比模式</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Loading Spinner Overlay -->
+            <div id="loadingOverlay" class="hidden absolute inset-0 bg-dark-900/80 backdrop-blur-xs flex flex-col items-center justify-center z-50">
+                <div class="w-10 h-10 border-4 border-brand-500/30 border-t-brand-500 rounded-full animate-spin mb-3"></div>
+                <span class="text-xs text-gray-300 font-medium" id="loadingText">處理中...</span>
+            </div>
+        </section>
+
+        <!-- Right Control Panel Sidebar -->
+        <aside class="w-full lg:w-96 bg-dark-800 border-t lg:border-t-0 lg:border-l border-dark-700 flex flex-col h-1/2 lg:h-full z-10">
+            
+            <!-- SECTION 1: Region Selection Tabs (Targeting) -->
+            <div class="p-4 border-b border-dark-700 space-y-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-gray-300 flex items-center gap-1.5">
+                        <i data-lucide="target" class="w-4 h-4 text-brand-500"></i> 當前編修分區目標
+                    </span>
+                    <button id="autoDetectSkinBtn" class="text-[11px] bg-brand-600/20 hover:bg-brand-600/30 text-brand-400 px-2 py-1 rounded border border-brand-500/30 transition flex items-center gap-1">
+                        <i data-lucide="sparkles" class="w-3 h-3"></i> 智慧捕捉膚色區
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-3 gap-2 pt-1">
+                    <button data-target="face" classtarget-btn target-tab active p-2 rounded-xl border border-dark-600 text-xs font-medium flex flex-col items-center gap-1 transition">
+                        <i data-lucide="user" class="w-4 h-4"></i>
+                        <span>人臉/膚色區</span>
+                    </button>
+                    <button data-target="bg" class="target-btn target-tab p-2 rounded-xl border border-dark-600 text-xs font-medium flex flex-col items-center gap-1 transition text-gray-400">
+                        <i data-lucide="image" class="w-4 h-4"></i>
+                        <span>背景區域</span>
+                    </button>
+                    <button data-target="global" class="target-btn target-tab p-2 rounded-xl border border-dark-600 text-xs font-medium flex flex-col items-center gap-1 transition text-gray-400">
+                        <i data-lucide="globe" class="w-4 h-4"></i>
+                        <span>全圖 (Global)</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- SECTION 2: Control Mode Sub-Tabs -->
+            <div class="flex border-b border-dark-700 bg-dark-800 shrink-0">
+                <button data-subtab="adjust" class="subtab-btn flex-1 py-2.5 text-xs font-semibold text-brand-500 border-b-2 border-brand-500 flex items-center justify-center gap-1.5 transition">
+                    <i data-lucide="sliders" class="w-3.5 h-3.5"></i>
+                    <span>區域調校</span>
+                </button>
+                <button data-subtab="maskBrush" class="subtab-btn flex-1 py-2.5 text-xs font-semibold text-gray-400 hover:text-gray-200 border-b-2 border-transparent flex items-center justify-center gap-1.5 transition">
+                    <i data-lucide="brush" class="w-3.5 h-3.5"></i>
+                    <span>遮罩修整筆刷</span>
+                </button>
+                <button data-subtab="spotSpot" class="subtab-btn flex-1 py-2.5 text-xs font-semibold text-gray-400 hover:text-gray-200 border-b-2 border-transparent flex items-center justify-center gap-1.5 transition">
+                    <i data-lucide="sparkle" class="w-3.5 h-3.5"></i>
+                    <span>去斑瑕疵筆刷</span>
+                </button>
+            </div>
+
+            <!-- Tab Contents Container -->
+            <div class="flex-1 overflow-y-auto p-5 space-y-5">
+
+                <!-- SUBTAB 1: Parameters for Active Region -->
+                <div id="subtab-adjust" class="subtab-content space-y-4">
+                    <div class="p-2.5 bg-dark-700/40 rounded-lg border border-dark-600/50 flex items-center justify-between text-xs">
+                        <span class="text-gray-400">當前正在調整：<strong id="activeTargetLabel" class="text-brand-400">人臉/膚色區</strong></span>
+                        <button id="resetCurrentTargetBtn" class="text-[11px] text-gray-400 hover:text-white underline">重設此區</button>
+                    </div>
+
+                    <!-- Brightness -->
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-xs">
+                            <label class="text-gray-300">區域亮度 (Brightness)</label>
+                            <span id="val-brightness" class="text-brand-400 font-mono">0%</span>
+                        </div>
+                        <input type="range" id="slider-brightness" min="-100" max="100" value="0">
+                    </div>
+
+                    <!-- Contrast -->
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-xs">
+                            <label class="text-gray-300">區域對比度 (Contrast)</label>
+                            <span id="val-contrast" class="text-brand-400 font-mono">0%</span>
+                        </div>
+                        <input type="range" id="slider-contrast" min="-100" max="100" value="0">
+                    </div>
+
+                    <!-- Saturation -->
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-xs">
+                            <label class="text-gray-300">區域飽和度 (Saturation)</label>
+                            <span id="val-saturation" class="text-brand-400 font-mono">0%</span>
+                        </div>
+                        <input type="range" id="slider-saturation" min="-100" max="100" value="0">
+                    </div>
+
+                    <!-- Skin Smoothness (Active for Face/Skin & Global) -->
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-xs">
+                            <label class="text-gray-300">磨皮平滑度 (Skin Smoothing)</label>
+                            <span id="val-smoothness" class="text-brand-400 font-mono">0%</span>
+                        </div>
+                        <input type="range" id="slider-smoothness" min="0" max="100" value="0">
+                    </div>
+
+                    <!-- Temperature / Warmth -->
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-xs">
+                            <label class="text-gray-300">區域色溫 (Temperature)</label>
+                            <span id="val-warmth" class="text-brand-400 font-mono">0%</span>
+                        </div>
+                        <input type="range" id="slider-warmth" min="-50" max="50" value="0">
+                    </div>
+
+                    <!-- Mask Feathering/Smooth Edge -->
+                    <div id="featherContainer" class="space-y-1 pt-2 border-t border-dark-700">
+                        <div class="flex justify-between text-xs">
+                            <label class="text-gray-300 font-medium">遮罩邊緣羽化 (Feathering)</label>
+                            <span id="val-feather" class="text-brand-400 font-mono">15px</span>
+                        </div>
+                        <input type="range" id="slider-feather" min="0" max="50" value="15">
+                    </div>
+                </div>
+
+                <!-- SUBTAB 2: Mask Editing Brush -->
+                <div id="subtab-maskBrush" class="subtab-content hidden space-y-4">
+                    <div class="p-3 bg-dark-700/40 rounded-lg border border-dark-600/50 text-xs text-gray-300 leading-relaxed">
+                        手動塗抹補充或擦除目前選取的遮罩範圍（半透明紅色）。
+                    </div>
+
+                    <div class="flex gap-2">
+                        <button id="maskAddBtn" class="flex-1 py-2 bg-brand-600 text-white rounded-lg text-xs font-medium flex items-center justify-center gap-1">
+                            <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i> 塗抹添加遮罩
+                        </button>
+                        <button id="maskEraseBtn" class="flex-1 py-2 bg-dark-700 text-gray-300 border border-dark-600 rounded-lg text-xs font-medium flex items-center justify-center gap-1">
+                            <i data-lucide="minus-circle" class="w-3.5 h-3.5"></i> 擦除扣除遮罩
+                        </button>
+                    </div>
+
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-xs">
+                            <label class="text-gray-300">筆刷大小 (Brush Size)</label>
+                            <span id="val-maskBrushSize" class="text-brand-400 font-mono">35px</span>
+                        </div>
+                        <input type="range" id="slider-maskBrushSize" min="5" max="150" value="35">
+                    </div>
+
+                    <button id="clearMaskBtn" class="w-full py-1.5 text-xs text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 rounded border border-red-500/20 transition">
+                        清空當前目標選取遮罩
+                    </button>
+                </div>
+
+                <!-- SUBTAB 3: Spot Removal Brush -->
+                <div id="subtab-spotSpot" class="subtab-content hidden space-y-4">
+                    <div class="p-3 bg-dark-700/40 rounded-lg border border-dark-600/50 text-xs text-gray-300">
+                        點選照片上的痘痘、斑點或微瑕，系統將智慧融合周邊質感進行點狀修復。
+                    </div>
+
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-xs">
+                            <label class="text-gray-300">斑點筆刷大小 (Spot Brush Size)</label>
+                            <span id="val-spotBrushSize" class="text-brand-400 font-mono">20px</span>
+                        </div>
+                        <input type="range" id="slider-spotBrushSize" min="5" max="80" value="20">
+                    </div>
+
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-xs">
+                            <label class="text-gray-300">修復強度 (Healing Intensity)</label>
+                            <span id="val-spotIntensity" class="text-brand-400 font-mono">80%</span>
+                        </div>
+                        <input type="range" id="slider-spotIntensity" min="10" max="100" value="80">
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Footer Info -->
+            <div class="p-4 border-t border-dark-700 text-center text-[11px] text-gray-500 shrink-0">
+                RetouchPro Studio &copy; 本地智慧 Canvas 處理，安全隱私不傳上雲
+            </div>
+        </aside>
+    </main>
+
+    <script>
+        // System State Manager
+        const state = {
+            originalImage: null,
+            width: 0,
+            height: 0,
+
+            // Active Tools
+            activeTarget: 'face', // 'face', 'bg', 'global'
+            activeSubtab: 'adjust', // 'adjust', 'maskBrush', 'spotSpot'
+            maskMode: 'add', // 'add', 'erase'
+            showMaskOverlay: true,
+
+            // Region Parameters
+            params: {
+                face: { brightness: 0, contrast: 0, saturation: 0, smoothness: 0, warmth: 0, feather: 15 },
+                bg: { brightness: 0, contrast: 0, saturation: 0, smoothness: 0, warmth: 0, feather: 15 },
+                global: { brightness: 0, contrast: 0, saturation: 0, smoothness: 0, warmth: 0, feather: 0 }
+            },
+
+            // Mask Layers (Uint8ClampedArray per pixel: 0-255)
+            faceMask: null,
+            bgMask: null,
+
+            // Brush Sizes
+            maskBrushSize: 35,
+            spotBrushSize: 20,
+            spotIntensity: 80,
+
+            // History Stack
+            history: [],
+            historyIndex: -1,
+            maxHistory: 12,
+
+            // Compare view
+            splitMode: false,
+            splitPos: 0.5,
+            isHoldingOriginal: false
+        };
+
+        // DOM Elements Map
+        const elements = {
+            dropzone: document.getElementById('dropzone'),
+            fileInput: document.getElementById('fileInput'),
+            sampleImgBtn: document.getElementById('sampleImgBtn'),
+            editorViewport: document.getElementById('editorViewport'),
+            canvasWrapper: document.getElementById('canvasWrapper'),
+            mainCanvas: document.getElementById('mainCanvas'),
+            compareCanvas: document.getElementById('compareCanvas'),
+            splitDivider: document.getElementById('splitDivider'),
+            brushCursor: document.getElementById('brushCursor'),
+            loadingOverlay: document.getElementById('loadingOverlay'),
+            loadingText: document.getElementById('loadingText'),
+
+            // Sliders
+            sliderBrightness: document.getElementById('slider-brightness'),
+            sliderContrast: document.getElementById('slider-contrast'),
+            sliderSaturation: document.getElementById('slider-saturation'),
+            sliderSmoothness: document.getElementById('slider-smoothness'),
+            sliderWarmth: document.getElementById('slider-warmth'),
+            sliderFeather: document.getElementById('slider-feather'),
+            sliderMaskBrushSize: document.getElementById('slider-maskBrushSize'),
+            sliderSpotBrushSize: document.getElementById('slider-spotBrushSize'),
+            sliderSpotIntensity: document.getElementById('slider-spotIntensity'),
+
+            // Buttons & UI Controls
+            autoDetectSkinBtn: document.getElementById('autoDetectSkinBtn'),
+            resetCurrentTargetBtn: document.getElementById('resetCurrentTargetBtn'),
+            toggleMaskOverlay: document.getElementById('toggleMaskOverlay'),
+            maskAddBtn: document.getElementById('maskAddBtn'),
+            maskEraseBtn: document.getElementById('maskEraseBtn'),
+            clearMaskBtn: document.getElementById('clearMaskBtn'),
+            
+            holdViewBtn: document.getElementById('holdViewBtn'),
+            splitModeBtn: document.getElementById('splitModeBtn'),
+            undoBtn: document.getElementById('undoBtn'),
+            redoBtn: document.getElementById('redoBtn'),
+            resetAllBtn: document.getElementById('resetAllBtn'),
+            downloadBtn: document.getElementById('downloadBtn')
+        };
+
+        const mainCtx = elements.mainCanvas.getContext('2d', { willReadFrequently: true });
+        const compareCtx = elements.compareCanvas.getContext('2d');
+        const originalCanvas = document.createElement('canvas');
+        const originalCtx = originalCanvas.getContext('2d', { willReadFrequently: true });
+
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        function init() {
+            // Drag and drop handlers
+            elements.dropzone.addEventListener('click', () => elements.fileInput.click());
+            elements.fileInput.addEventListener('change', (e) => e.target.files[0] && loadImageFromFile(e.target.files[0]));
+            
+            elements.dropzone.addEventListener('dragover', (e) => { e.preventDefault(); elements.dropzone.classList.add('border-brand-500'); });
+            elements.dropzone.addEventListener('dragleave', () => elements.dropzone.classList.remove('border-brand-500'));
+            elements.dropzone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                elements.dropzone.classList.remove('border-brand-500');
+                if (e.dataTransfer.files[0]) loadImageFromFile(e.dataTransfer.files[0]);
+            });
+
+            elements.sampleImgBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                loadSampleImage();
+            });
+
+            // Target Tabs Switch
+            document.querySelectorAll('.target-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.target-btn').forEach(b => {
+                        b.classList.remove('target-tab', 'active', 'border-brand-500', 'text-white');
+                        b.classList.add('text-gray-400');
+                    });
+                    btn.classList.add('target-tab', 'active', 'border-brand-500', 'text-white');
+                    btn.classList.remove('text-gray-400');
+
+                    state.activeTarget = btn.getAttribute('data-target');
+                    updateTargetUI();
+                    requestRender();
+                });
+            });
+
+            // Subtab Navigation Switch
+            document.querySelectorAll('.subtab-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.subtab-btn').forEach(b => {
+                        b.classList.remove('text-brand-500', 'border-brand-500');
+                        b.classList.add('text-gray-400', 'border-transparent');
+                    });
+                    btn.classList.add('text-brand-500', 'border-brand-500');
+                    btn.classList.remove('text-gray-400', 'border-transparent');
+
+                    state.activeSubtab = btn.getAttribute('data-subtab');
+                    document.querySelectorAll('.subtab-content').forEach(c => c.classList.add('hidden'));
+                    document.getElementById(`subtab-${state.activeSubtab}`).classList.remove('hidden');
+
+                    updateCursorMode();
+                });
+            });
+
+            // Bind Control Sliders
+            bindSlider('sliderBrightness', 'val-brightness', '%', (v) => state.params[state.activeTarget].brightness = parseInt(v));
+            bindSlider('sliderContrast', 'val-contrast', '%', (v) => state.params[state.activeTarget].contrast = parseInt(v));
+            bindSlider('sliderSaturation', 'val-saturation', '%', (v) => state.params[state.activeTarget].saturation = parseInt(v));
+            bindSlider('sliderSmoothness', 'val-smoothness', '%', (v) => state.params[state.activeTarget].smoothness = parseInt(v));
+            bindSlider('sliderWarmth', 'val-warmth', '%', (v) => state.params[state.activeTarget].warmth = parseInt(v));
+            bindSlider('sliderFeather', 'val-feather', 'px', (v) => state.params[state.activeTarget].feather = parseInt(v));
+            
+            bindSlider('sliderMaskBrushSize', 'val-maskBrushSize', 'px', (v) => state.maskBrushSize = parseInt(v));
+            bindSlider('sliderSpotBrushSize', 'val-spotBrushSize', 'px', (v) => state.spotBrushSize = parseInt(v));
+            bindSlider('sliderSpotIntensity', 'val-spotIntensity', '%', (v) => state.spotIntensity = parseInt(v));
+
+            // Mask Editing Actions
+            elements.autoDetectSkinBtn.addEventListener('click', detectSkinMask);
+            elements.resetCurrentTargetBtn.addEventListener('click', resetCurrentTarget);
+            elements.toggleMaskOverlay.addEventListener('change', (e) => {
+                state.showMaskOverlay = e.target.checked;
+                requestRender();
+            });
+
+            elements.maskAddBtn.addEventListener('click', () => {
+                state.maskMode = 'add';
+                elements.maskAddBtn.className = 'flex-1 py-2 bg-brand-600 text-white rounded-lg text-xs font-medium flex items-center justify-center gap-1';
+                elements.maskEraseBtn.className = 'flex-1 py-2 bg-dark-700 text-gray-300 border border-dark-600 rounded-lg text-xs font-medium flex items-center justify-center gap-1';
+            });
+
+            elements.maskEraseBtn.addEventListener('click', () => {
+                state.maskMode = 'erase';
+                elements.maskEraseBtn.className = 'flex-1 py-2 bg-brand-600 text-white rounded-lg text-xs font-medium flex items-center justify-center gap-1';
+                elements.maskAddBtn.className = 'flex-1 py-2 bg-dark-700 text-gray-300 border border-dark-600 rounded-lg text-xs font-medium flex items-center justify-center gap-1';
+            });
+
+            elements.clearMaskBtn.addEventListener('click', clearCurrentMask);
+
+            // App Actions
+            elements.undoBtn.addEventListener('click', undo);
+            elements.redoBtn.addEventListener('click', redo);
+            elements.resetAllBtn.addEventListener('click', resetAll);
+            elements.downloadBtn.addEventListener('click', downloadResult);
+
+            setupCompareControls();
+            setupCanvasBrushInteractions();
+        }
+
+        function bindSlider(id, valId, unit, callback) {
+            elements[id].addEventListener('input', (e) => {
+                document.getElementById(valId).textContent = e.target.value + unit;
+                callback(e.target.value);
+                requestRender();
+            });
+        }
+
+        function loadImageFromFile(file) {
+            showLoading(true, "載入照片中...");
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => { initCanvasWithImage(img); showLoading(false); };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function loadSampleImage() {
+            showLoading(true, "載入範例照片中...");
+            const sampleUrl = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1200&q=80";
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.onload = () => { initCanvasWithImage(img); showLoading(false); };
+            img.onerror = () => { showLoading(false); alert("範例載入失敗，請上傳照片。"); };
+            img.src = sampleUrl;
+        }
+
+        function initCanvasWithImage(img) {
+            state.originalImage = img;
+            const maxDim = 1600;
+            let w = img.width, h = img.height;
+
+            if (w > maxDim || h > maxDim) {
+                if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+                else { w = Math.round((w * maxDim) / h); h = maxDim; }
+            }
+
+            state.width = w;
+            state.height = h;
+
+            originalCanvas.width = w; originalCanvas.height = h;
+            originalCtx.drawImage(img, 0, 0, w, h);
+
+            elements.mainCanvas.width = w; elements.mainCanvas.height = h;
+            elements.compareCanvas.width = w; elements.compareCanvas.height = h;
+            compareCtx.drawImage(img, 0, 0, w, h);
+
+            // Init Masks Array
+            state.faceMask = new Uint8Array(w * h);
+            state.bgMask = new Uint8Array(w * h);
+
+            // Auto Detect Skin as default face mask
+            detectSkinMask();
+
+            // Setup UI
+            elements.dropzone.classList.add('hidden');
+            elements.editorViewport.classList.remove('hidden');
+            elements.downloadBtn.disabled = false;
+
+            saveHistoryState();
+            requestRender();
+        }
+
+        // Skin Detection based on YCbCr / HSV color space thresholds
+        function detectSkinMask() {
+            if (!state.width) return;
+            showLoading(true, "智慧分析膚色與人臉區域...");
+
+            setTimeout(() => {
+                const imgData = originalCtx.getImageData(0, 0, state.width, state.height);
+                const data = imgData.data;
+                const len = state.width * state.height;
+
+                for (let i = 0; i < len; i++) {
+                    const idx = i * 4;
+                    const r = data[idx], g = data[idx + 1], b = data[idx + 2];
+
+                    // RGB to YCbCr conversion
+                    const cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
+                    const cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
+
+                    // Skin color thresholds
+                    const isSkin = (r > 60 && g > 40 && b > 20 && (Math.max(r, g, b) - Math.min(r, g, b) > 12) && Math.abs(r - g) > 12 && r > g && r > b) &&
+                                   (cb >= 77 && cb <= 127 && cr >= 133 && cr <= 173);
+
+                    state.faceMask[i] = isSkin ? 255 : 0;
+                    state.bgMask[i] = isSkin ? 0 : 255; // Inverse for Background
+                }
+
+                showLoading(false);
+                requestRender();
+            }, 50);
+        }
+
+        // Update Slider UI values when switching Target
+        function updateTargetUI() {
+            const current = state.params[state.activeTarget];
+            const labelMap = { face: '人臉/膚色區', bg: '背景區域', global: '全圖 (Global)' };
+            document.getElementById('activeTargetLabel').textContent = labelMap[state.activeTarget];
+
+            const featherContainer = document.getElementById('featherContainer');
+            if (state.activeTarget === 'global') featherContainer.classList.add('hidden');
+            else featherContainer.classList.remove('hidden');
+
+            elements.sliderBrightness.value = current.brightness;
+            document.getElementById('val-brightness').textContent = current.brightness + '%';
+
+            elements.sliderContrast.value = current.contrast;
+            document.getElementById('val-contrast').textContent = current.contrast + '%';
+
+            elements.sliderSaturation.value = current.saturation;
+            document.getElementById('val-saturation').textContent = current.saturation + '%';
+
+            elements.sliderSmoothness.value = current.smoothness;
+            document.getElementById('val-smoothness').textContent = current.smoothness + '%';
+
+            elements.sliderWarmth.value = current.warmth;
+            document.getElementById('val-warmth').textContent = current.warmth + '%';
+
+            elements.sliderFeather.value = current.feather;
+            document.getElementById('val-feather').textContent = current.feather + 'px';
+        }
+
+        function resetCurrentTarget() {
+            state.params[state.activeTarget] = { brightness: 0, contrast: 0, saturation: 0, smoothness: 0, warmth: 0, feather: 15 };
+            updateTargetUI();
+            requestRender();
+        }
+
+        function clearCurrentMask() {
+            if (state.activeTarget === 'global') return;
+            const mask = state.activeTarget === 'face' ? state.faceMask : state.bgMask;
+            mask.fill(0);
+            requestRender();
+        }
+
+        let renderRequested = false;
+        function requestRender() {
+            if (!renderRequested) {
+                renderRequested = true;
+                requestAnimationFrame(() => {
+                    renderPipeline();
+                    renderRequested = false;
+                });
+            }
+        }
+
+        function renderPipeline() {
+            if (!state.originalImage) return;
+
+            const w = state.width, h = state.height;
+            const baseData = state.historyIndex >= 0 ? state.history[state.historyIndex].data : originalCtx.getImageData(0, 0, w, h).data;
+
+            // Output ImageData
+            const outImgData = new ImageData(w, h);
+            const out = outImgData.data;
+
+            // 1. Prepare smoothed base if needed
+            let maxSmooth = Math.max(state.params.face.smoothness, state.params.bg.smoothness, state.params.global.smoothness);
+            let smoothedData = null;
+            if (maxSmooth > 0) {
+                smoothedData = getSmoothedImageData(baseData, w, h, maxSmooth).data;
+            }
+
+            // 2. Pixel-by-pixel Regional Compositing
+            for (let i = 0; i < w * h; i++) {
+                const idx = i * 4;
+                let r = baseData[idx], g = baseData[idx + 1], b = baseData[idx + 2];
+
+                // Face Mask Weight (0.0 to 1.0)
+                const faceW = state.faceMask[i] / 255;
+                const bgW = state.bgMask[i] / 255;
+
+                // Apply adjustments per region
+                let rFace = r, gFace = g, bFace = b;
+                let rBg = r, gBg = g, bBg = b;
+                let rGlobal = r, gGlobal = g, bGlobal = b;
+
+                // Smoothing blend
+                if (smoothedData) {
+                    if (state.params.face.smoothness > 0) {
+                        const smF = state.params.face.smoothness / 100;
+                        rFace = rFace * (1 - smF) + smoothedData[idx] * smF;
+                        gFace = gFace * (1 - smF) + smoothedData[idx + 1] * smF;
+                        bFace = bFace * (1 - smF) + smoothedData[idx + 2] * smF;
+                    }
+                    if (state.params.bg.smoothness > 0) {
+                        const smBg = state.params.bg.smoothness / 100;
+                        rBg = rBg * (1 - smBg) + smoothedData[idx] * smBg;
+                        gBg = gBg * (1 - smBg) + smoothedData[idx + 1] * smBg;
+                        bBg = bBg * (1 - smBg) + smoothedData[idx + 2] * smBg;
+                    }
+                    if (state.params.global.smoothness > 0) {
+                        const smG = state.params.global.smoothness / 100;
+                        rGlobal = rGlobal * (1 - smG) + smoothedData[idx] * smG;
+                        gGlobal = gGlobal * (1 - smG) + smoothedData[idx + 1] * smG;
+                        bGlobal = bGlobal * (1 - smG) + smoothedData[idx + 2] * smG;
+                    }
+                }
+
+                // Adjust Color per Region
+                [rFace, gFace, bFace] = adjustPixelColor(rFace, gFace, bFace, state.params.face);
+                [rBg, gBg, bBg] = adjustPixelColor(rBg, gBg, bBg, state.params.bg);
+                [rGlobal, gGlobal, bGlobal] = adjustPixelColor(rGlobal, gGlobal, bGlobal, state.params.global);
+
+                // Blend Regions according to Masks
+                let finalR = rGlobal * (1 - faceW - bgW) + rFace * faceW + rBg * bgW;
+                let finalG = gGlobal * (1 - faceW - bgW) + gFace * faceW + gBg * bgW;
+                let finalB = bGlobal * (1 - faceW - bgW) + bFace * faceW + bBg * bgW;
+
+                // Mask Visualization Overlay (Semi-transparent Red)
+                if (state.showMaskOverlay && state.activeTarget !== 'global') {
+                    const activeW = state.activeTarget === 'face' ? faceW : bgW;
+                    if (activeW > 0.05) {
+                        finalR = finalR * 0.6 + 230 * 0.4 * activeW;
+                        finalG = finalG * 0.6;
+                        finalB = finalB * 0.6;
+                    }
+                }
+
+                out[idx] = Math.min(255, Math.max(0, finalR));
+                out[idx + 1] = Math.min(255, Math.max(0, finalG));
+                out[idx + 2] = Math.min(255, Math.max(0, finalB));
+                out[idx + 3] = 255;
+            }
+
+            mainCtx.putImageData(outImgData, 0, 0);
+
+            if (state.splitMode) updateSplitView();
+        }
+
+        function adjustPixelColor(r, g, b, params) {
+            if (params.brightness === 0 && params.contrast === 0 && params.saturation === 0 && params.warmth === 0) {
+                return [r, g, b];
+            }
+
+            // Brightness & Contrast
+            const bMult = params.brightness * 1.2;
+            const cFactor = (259 * (params.contrast + 255)) / (255 * (259 - params.contrast));
+            
+            r = cFactor * (r + bMult - 128) + 128;
+            g = cFactor * (g + bMult - 128) + 128;
+            b = cFactor * (b + bMult - 128) + 128;
+
+            // Warmth / Temperature
+            if (params.warmth !== 0) {
+                r += params.warmth * 0.7;
+                b -= params.warmth * 0.7;
+            }
+
+            // Saturation
+            if (params.saturation !== 0) {
+                const gray = 0.2989 * r + 0.5870 * g + 0.1140 * b;
+                const sMult = (params.saturation + 100) / 100;
+                r = gray + (r - gray) * sMult;
+                g = gray + (g - gray) * sMult;
+                b = gray + (b - gray) * sMult;
+            }
+
+            return [r, g, b];
+        }
+
+        function getSmoothedImageData(baseData, w, h, smoothnessVal) {
+            const tempC = document.createElement('canvas');
+            tempC.width = w; tempC.height = h;
+            const tempCtx = tempC.getContext('2d');
+            const imgData = new ImageData(new Uint8ClampedArray(baseData), w, h);
+            tempCtx.putImageData(imgData, 0, 0);
+
+            const radius = Math.max(1, Math.round((smoothnessVal / 100) * 8));
+            tempCtx.filter = `blur(${radius}px)`;
+            tempCtx.drawImage(tempC, 0, 0);
+
+            return tempCtx.getImageData(0, 0, w, h);
+        }
+
+        function setupCanvasBrushInteractions() {
+            let isDrawing = false;
+            const canvas = elements.mainCanvas;
+
+            const getCoords = (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                return {
+                    x: Math.round((clientX - rect.left) * (canvas.width / rect.width)),
+                    y: Math.round((clientY - rect.top) * (canvas.height / rect.height))
+                };
+            };
+
+            const handlePointerMove = (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+                // Update custom circle cursor
+                if (state.activeSubtab !== 'adjust') {
+                    elements.brushCursor.classList.remove('hidden');
+                    const wrapperRect = elements.canvasWrapper.getBoundingClientRect();
+                    elements.brushCursor.style.left = `${clientX - wrapperRect.left}px`;
+                    elements.brushCursor.style.top = `${clientY - wrapperRect.top}px`;
+                } else {
+                    elements.brushCursor.classList.add('hidden');
+                }
+
+                if (isDrawing) {
+                    const coords = getCoords(e);
+                    if (state.activeSubtab === 'maskBrush') applyMaskBrush(coords.x, coords.y);
+                    else if (state.activeSubtab === 'spotSpot') applySpotHealing(coords.x, coords.y);
+                }
+            };
+
+            const handlePointerDown = (e) => {
+                if (state.activeSubtab === 'adjust' || state.splitMode || state.isHoldingOriginal) return;
+                isDrawing = true;
+                const coords = getCoords(e);
+                if (state.activeSubtab === 'maskBrush') applyMaskBrush(coords.x, coords.y);
+                else if (state.activeSubtab === 'spotSpot') applySpotHealing(coords.x, coords.y);
+            };
+
+            const handlePointerUp = () => {
+                if (isDrawing) {
+                    isDrawing = false;
+                    saveHistoryState();
+                }
+            };
+
+            canvas.addEventListener('mousedown', handlePointerDown);
+            canvas.addEventListener('mousemove', handlePointerMove);
+            window.addEventListener('mouseup', handlePointerUp);
+
+            canvas.addEventListener('touchstart', handlePointerDown, { passive: true });
+            canvas.addEventListener('touchmove', handlePointerMove, { passive: true });
+            window.addEventListener('touchend', handlePointerUp);
+        }
+
+        function updateCursorMode() {
+            const canvas = elements.mainCanvas;
+            if (state.activeSubtab === 'adjust') {
+                canvas.classList.remove('cursor-none');
+                canvas.classList.add('cursor-default');
+                elements.brushCursor.classList.add('hidden');
+            } else {
+                canvas.classList.remove('cursor-default');
+                canvas.classList.add('cursor-none');
+                updateBrushCursorSize();
+            }
+        }
+
+        function updateBrushCursorSize() {
+            if (!elements.mainCanvas.width) return;
+            const rect = elements.mainCanvas.getBoundingClientRect();
+            const scale = rect.width / elements.mainCanvas.width;
+            const currentSize = state.activeSubtab === 'maskBrush' ? state.maskBrushSize : state.spotBrushSize;
+            const displaySize = currentSize * scale;
+
+            elements.brushCursor.style.width = `${displaySize}px`;
+            elements.brushCursor.style.height = `${displaySize}px`;
+        }
+
+        function applyMaskBrush(centerX, centerY) {
+            if (state.activeTarget === 'global') return;
+            const mask = state.activeTarget === 'face' ? state.faceMask : state.bgMask;
+            const radius = state.maskBrushSize / 2;
+            const val = state.maskMode === 'add' ? 255 : 0;
+
+            const startX = Math.max(0, Math.floor(centerX - radius));
+            const startY = Math.max(0, Math.floor(centerY - radius));
+            const endX = Math.min(state.width, Math.ceil(centerX + radius));
+            const endY = Math.min(state.height, Math.ceil(centerY + radius));
+
+            for (let y = startY; y < endY; y++) {
+                for (let x = startX; x < endX; x++) {
+                    if (Math.hypot(x - centerX, y - centerY) <= radius) {
+                        mask[y * state.width + x] = val;
+                    }
+                }
+            }
+            requestRender();
+        }
+
+        function applySpotHealing(centerX, centerY) {
+            const radius = state.spotBrushSize / 2;
+            const intensity = state.spotIntensity / 100;
+            const w = state.width, h = state.height;
+
+            const curImgData = state.historyIndex >= 0 ? state.history[state.historyIndex] : originalCtx.getImageData(0, 0, w, h);
+            const data = curImgData.data;
+
+            // Sample surrounding ring for reference skin texture
+            let outerR = 0, outerG = 0, outerB = 0, outerCount = 0;
+            const outerRMin = radius * 0.9, outerRMax = radius * 1.4;
+
+            for (let y = Math.max(0, Math.floor(centerY - outerRMax)); y < Math.min(h, Math.ceil(centerY + outerRMax)); y++) {
+                for (let x = Math.max(0, Math.floor(centerX - outerRMax)); x < Math.min(w, Math.ceil(centerX + outerRMax)); x++) {
+                    const dist = Math.hypot(x - centerX, y - centerY);
+                    if (dist >= outerRMin && dist <= outerRMax) {
+                        const idx = (y * w + x) * 4;
+                        outerR += data[idx]; outerG += data[idx + 1]; outerB += data[idx + 2];
+                        outerCount++;
+                    }
+                }
+            }
+
+            if (outerCount === 0) return;
+            const avgR = outerR / outerCount, avgG = outerG / outerCount, avgB = outerB / outerCount;
+
+            const startX = Math.max(0, Math.floor(centerX - radius));
+            const startY = Math.max(0, Math.floor(centerY - radius));
+            const endX = Math.min(w, Math.ceil(centerX + radius));
+            const endY = Math.min(h, Math.ceil(centerY + radius));
+
+            for (let y = startY; y < endY; y++) {
+                for (let x = startX; x < endX; x++) {
+                    const dist = Math.hypot(x - centerX, y - centerY);
+                    if (dist <= radius) {
+                        const idx = (y * w + x) * 4;
+                        const alpha = Math.cos((dist / radius) * (Math.PI / 2)) * intensity;
+                        data[idx] = data[idx] * (1 - alpha) + avgR * alpha;
+                        data[idx + 1] = data[idx + 1] * (1 - alpha) + avgG * alpha;
+                        data[idx + 2] = data[idx + 2] * (1 - alpha) + avgB * alpha;
+                    }
+                }
+            }
+
+            requestRender();
+        }
+
+        function saveHistoryState() {
+            if (state.historyIndex < state.history.length - 1) {
+                state.history = state.history.slice(0, state.historyIndex + 1);
+            }
+
+            const currentData = mainCtx.getImageData(0, 0, state.width, state.height);
+            state.history.push(currentData);
+            if (state.history.length > state.maxHistory) state.history.shift();
+            else state.historyIndex++;
+
+            updateHistoryButtons();
+        }
+
+        function undo() {
+            if (state.historyIndex > 0) {
+                state.historyIndex--;
+                updateHistoryButtons();
+                requestRender();
+            }
+        }
+
+        function redo() {
+            if (state.historyIndex < state.history.length - 1) {
+                state.historyIndex++;
+                updateHistoryButtons();
+                requestRender();
+            }
+        }
+
+        function updateHistoryButtons() {
+            elements.undoBtn.disabled = state.historyIndex <= 0;
+            elements.redoBtn.disabled = state.historyIndex >= state.history.length - 1;
+        }
+
+        function setupCompareControls() {
+            const startHold = () => {
+                if (!state.originalImage) return;
+                state.isHoldingOriginal = true;
+                elements.compareCanvas.classList.remove('opacity-0');
+                elements.compareCanvas.classList.add('opacity-100');
+            };
+
+            const endHold = () => {
+                state.isHoldingOriginal = false;
+                if (!state.splitMode) {
+                    elements.compareCanvas.classList.remove('opacity-100');
+                    elements.compareCanvas.classList.add('opacity-0');
+                }
+            };
+
+            elements.holdViewBtn.addEventListener('mousedown', startHold);
+            elements.holdViewBtn.addEventListener('mouseup', endHold);
+            elements.holdViewBtn.addEventListener('mouseleave', endHold);
+
+            elements.splitModeBtn.addEventListener('click', () => {
+                state.splitMode = !state.splitMode;
+                if (state.splitMode) {
+                    elements.splitModeBtn.classList.add('bg-brand-600', 'text-white');
+                    elements.splitDivider.classList.remove('hidden');
+                    elements.compareCanvas.classList.remove('opacity-0');
+                    elements.compareCanvas.classList.add('opacity-100');
+                    updateSplitView();
+                } else {
+                    elements.splitModeBtn.classList.remove('bg-brand-600', 'text-white');
+                    elements.splitDivider.classList.add('hidden');
+                    elements.compareCanvas.classList.remove('opacity-100');
+                    elements.compareCanvas.classList.add('opacity-0');
+                    elements.compareCanvas.style.clipPath = 'none';
+                }
+            });
+
+            let isDraggingSplit = false;
+            const onSplitMove = (e) => {
+                if (!isDraggingSplit) return;
+                const rect = elements.canvasWrapper.getBoundingClientRect();
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                let pos = (clientX - rect.left) / rect.width;
+                state.splitPos = Math.max(0, Math.min(1, pos));
+                updateSplitView();
+            };
+
+            elements.splitDivider.addEventListener('mousedown', () => isDraggingSplit = true);
+            window.addEventListener('mousemove', onSplitMove);
+            window.addEventListener('mouseup', () => isDraggingSplit = false);
+        }
+
+        function updateSplitView() {
+            if (!state.splitMode) return;
+            const pct = state.splitPos * 100;
+            elements.splitDivider.style.left = `${pct}%`;
+            elements.compareCanvas.style.clipPath = `polygon(0 0, ${pct}% 0, ${pct}% 100%, 0 100%)`;
+        }
+
+        function resetAll() {
+            state.params = {
+                face: { brightness: 0, contrast: 0, saturation: 0, smoothness: 0, warmth: 0, feather: 15 },
+                bg: { brightness: 0, contrast: 0, saturation: 0, smoothness: 0, warmth: 0, feather: 15 },
+                global: { brightness: 0, contrast: 0, saturation: 0, smoothness: 0, warmth: 0, feather: 0 }
+            };
+            updateTargetUI();
+            if (state.width > 0) detectSkinMask();
+        }
+
+        function downloadResult() {
+            if (!elements.mainCanvas.width) return;
+            
+            // Temporary hide mask overlay during export
+            const oldOverlayState = state.showMaskOverlay;
+            state.showMaskOverlay = false;
+            renderPipeline();
+
+            const link = document.createElement('a');
+            link.download = `retouch-regional-${Date.now()}.png`;
+            link.href = elements.mainCanvas.toDataURL('image/png', 1.0);
+            link.click();
+
+            state.showMaskOverlay = oldOverlayState;
+            renderPipeline();
+        }
+
+        function showLoading(show, text = "處理中...") {
+            elements.loadingText.textContent = text;
+            if (show) elements.loadingOverlay.classList.remove('hidden');
+            else elements.loadingOverlay.classList.add('hidden');
+        }
+
+        // Global Shortcuts
+        window.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+                e.preventDefault();
+                if (e.shiftKey) redo(); else undo();
+            } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+                e.preventDefault(); redo();
+            }
+        });
+
+        // Initialize App on Load
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
